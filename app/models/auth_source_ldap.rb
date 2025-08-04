@@ -54,16 +54,37 @@ class AuthSourceLdap < AuthSource
 
   def authenticate(login, password)
     return nil if login.blank? || password.blank?
+    logger.debug "[LDAP] Starting authentication for '#{login}'" if logger && logger.debug?
 
     with_timeout do
       attrs = get_user_dn(login, password)
-      if attrs && attrs[:dn] && authenticate_dn(attrs[:dn], password)
-        logger.debug "Authentication successful for '#{login}'" if logger && logger.debug?
-        return attrs.except(:dn)
+      logger.debug "[LDAP] get_user_dn result: #{attrs.inspect}" if logger && logger.debug?
+      if attrs && attrs[:dn]
+        if authenticate_dn(attrs[:dn], password)
+          logger.debug "[LDAP] Authentication successful for '#{login}' (DN: #{attrs[:dn]})" if logger && logger.debug?
+          # Robust attribute mapping, ensure all required keys
+          result = {
+            login: login,
+            firstname: attrs[:firstname] || '',
+            lastname: attrs[:lastname] || '',
+            mail: attrs[:mail] || ''
+          }
+          logger.debug "[LDAP] Returning user attributes: #{result.inspect}" if logger && logger.debug?
+          return result
+        else
+          logger.warn "[LDAP] Password authentication failed for '#{login}' (DN: #{attrs[:dn]})" if logger && logger.warn?
+        end
+      else
+        logger.warn "[LDAP] No DN found for '#{login}'" if logger && logger.warn?
       end
     end
+    nil
   rescue *NETWORK_EXCEPTIONS => e
+    logger.error "[LDAP] Network/auth error for '#{login}': #{e.message}" if logger && logger.error?
     raise AuthSourceException.new("#{auth_method_name}: #{e.message}")
+  rescue => e
+    logger.error "[LDAP] Unexpected error for '#{login}': #{e.class}: #{e.message}" if logger && logger.error?
+    nil
   end
 
   # Test the connection to the LDAP
