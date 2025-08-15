@@ -11,9 +11,10 @@ RUN apt-get update -qq && \
 WORKDIR /redmica
 
 # Copy Gemfiles and install gems (caching)
-COPY Gemfile Gemfile.lock ./
-RUN bundle config set --local deployment 'true' && \
-    bundle config set --local without 'development test' && \
+COPY Gemfile ./
+# Copy Gemfile.lock - bundle will handle if missing
+COPY Gemfile.lock ./
+RUN bundle config set --local without 'development test' && \
     bundle install
 
 # Copy the rest of the Redmica app
@@ -21,8 +22,9 @@ COPY . .
 
 # Set environment variables for asset compilation
 ENV RAILS_ENV=production \
-    SECRET_KEY_BASE=dummy_key_for_build \
     DATABASE_URL=postgresql://dummy:dummy@dummy:5432/dummy
+ARG SECRET_KEY_BASE=dummy_key_for_build
+ENV SECRET_KEY_BASE=${SECRET_KEY_BASE}
 
 # Precompile assets
 RUN bundle exec rake assets:precompile
