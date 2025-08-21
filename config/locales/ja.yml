@@ -1173,6 +1173,8 @@ ja:
   label_fields_mapping: フィールドの対応関係
   label_file_content_preview: ファイル内容のプレビュー
   label_create_missing_values: 存在しない値は新規作成
+  label_position: 位置
+  label_message: メッセージ
   button_import: インポート
   field_total_estimated_hours: 合計予定工数
   label_api: API
@@ -1481,3 +1483,4 @@ ja:
   text_oauth_info_scopes: Select the scopes this application may request. The application
     will not be allowed to do more than what is selected here. It will also always be
     limited by the roles and project memberships of the user who authorized it.
+  twofa_already_setup: Two-factor authentication already set up
