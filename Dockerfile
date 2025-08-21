@@ -1,61 +1,74 @@
-# Based on official Redmica Docker approach
-FROM ruby:3.2-slim-bookworm
+# Multi-stage build for optimized Redmica image
+FROM ruby:3.2-slim AS builder
 
-# Create redmine user (matching official approach)
-RUN groupadd -r -g 999 redmine && useradd -r -g redmine -u 999 redmine
-
-# Install runtime and build dependencies
-RUN set -eux; \
-    apt-get update; \
+# Install build dependencies
+RUN apt-get update -qq && \
     apt-get install -y --no-install-recommends \
-        ca-certificates \
+        build-essential \
+        libpq-dev \
+        nodejs \
+        npm \
         git \
-        imagemagick \
-        tini \
-        wget \
-        # Build dependencies
-        gcc \
-        postgresql-server-dev-all \
         libyaml-dev \
-        make \
-        patch \
-        pkgconf \
-    ; \
+        libffi-dev \
+        libssl-dev && \
+    npm install -g yarn && \
     rm -rf /var/lib/apt/lists/*
 
-ENV RAILS_ENV=production
-WORKDIR /usr/src/redmine
+WORKDIR /redmica
 
-# Set up home directory for redmine user
-ENV HOME=/home/redmine
-RUN set -eux; \
-    mkdir -p "$HOME"; \
-    chown redmine:redmine "$HOME"; \
-    chmod 1777 "$HOME"
+# Copy and install gems
+COPY Gemfile* ./
+RUN bundle config set --local without 'development test' && \
+    bundle install --jobs 4 --retry 3 && \
+    bundle clean --force
 
 # Copy application code
 COPY . .
 
-# Install gems and set permissions
-RUN set -eux; \
-    mkdir -p log public/plugin_assets tmp/pdf tmp/pids; \
-    chown -R redmine:redmine ./; \
-    chmod -R ugo=rwX config db; \
-    find log tmp -type d -exec chmod 1777 '{}' +; \
-    \
-    # Install gems as redmine user
-    su redmine -c "bundle config --local without 'development test'"; \
-    su redmine -c "bundle install --jobs $(nproc)"; \
-    \
-    # Clean up build dependencies
-    apt-get purge -y --auto-remove gcc make patch pkgconf
+# Production stage
+FROM ruby:3.2-slim AS production
 
-VOLUME /usr/src/redmine/files
+# Install only runtime dependencies
+RUN apt-get update -qq && \
+    apt-get install -y --no-install-recommends \
+        libpq5 \
+        imagemagick \
+        curl \
+        libyaml-0-2 \
+        libffi8 \
+        libssl3 && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get clean
 
-# Simple entrypoint
-RUN echo '#!/bin/bash\nset -e\nexec "$@"' > /docker-entrypoint.sh && \
-    chmod +x /docker-entrypoint.sh
+WORKDIR /redmica
 
-ENTRYPOINT ["/docker-entrypoint.sh"]
+# Copy gems from builder stage
+COPY --from=builder /usr/local/bundle /usr/local/bundle
+
+# Copy application from builder stage
+COPY --from=builder /redmica /redmica
+
+# Set environment variables
+ENV RAILS_ENV=production \
+    RAILS_SERVE_STATIC_FILES=true
+
+# Create entrypoint script
+RUN echo '#!/bin/bash\n\
+set -e\n\
+echo "Precompiling assets..."\n\
+RAILS_ENV=production SECRET_KEY_BASE=${SECRET_KEY_BASE:-$(bundle exec rails secret)} bundle exec rake assets:precompile\n\
+echo "Starting Redmica..."\n\
+exec bundle exec rails server -b 0.0.0.0' > /usr/local/bin/docker-entrypoint.sh && \
+    chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# Create non-root user and set ownership
+RUN useradd -m -u 1000 redmica && \
+    chown -R redmica:redmica /redmica
+USER redmica
+
+# Expose default Redmica port
 EXPOSE 3000
-CMD ["rails", "server", "-b", "0.0.0.0"]
+
+# Entrypoint for production
+CMD ["/usr/local/bin/docker-entrypoint.sh"]
