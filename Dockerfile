@@ -19,14 +19,19 @@ RUN bundle config set --local without 'development test' && \
 # Copy the rest of the Redmica app
 COPY . .
 
-# Set environment variables for asset compilation
-ENV RAILS_ENV=production \
-    DATABASE_URL=postgresql://dummy:dummy@dummy:5432/dummy
+# Set environment variables for production
+ENV RAILS_ENV=production
 
-# Precompile assets with temporary secret key
-RUN SECRET_KEY_BASE=dummy_key_for_build_only bundle exec rake assets:precompile
+# Create entrypoint script for asset precompilation at runtime
+RUN echo '#!/bin/bash\n\
+set -e\n\
+echo "Precompiling assets..."\n\
+RAILS_ENV=production SECRET_KEY_BASE=${SECRET_KEY_BASE:-$(bundle exec rails secret)} bundle exec rake assets:precompile\n\
+echo "Starting Redmica..."\n\
+exec bundle exec rails server -b 0.0.0.0' > /usr/local/bin/docker-entrypoint.sh && \
+    chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Create non-root user
+# Create non-root user and set ownership
 RUN useradd -m -u 1000 redmica && \
     chown -R redmica:redmica /redmica
 USER redmica
@@ -35,4 +40,4 @@ USER redmica
 EXPOSE 3000
 
 # Entrypoint for production
-CMD ["bundle", "exec", "rails", "server", "-b", "0.0.0.0"]
+CMD ["/usr/local/bin/docker-entrypoint.sh"]
