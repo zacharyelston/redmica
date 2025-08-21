@@ -1,43 +1,61 @@
-# Dockerfile for custom Redmica build (with RAG tools and LDAP patch)
-FROM ruby:3.2-slim
+# Based on official Redmica Docker approach
+FROM ruby:3.2-slim-bookworm
 
-# Install system dependencies including libyaml-dev for psych gem
-RUN apt-get update -qq && \
-    apt-get install -y build-essential libpq-dev nodejs npm imagemagick git curl \
-                       libyaml-dev libffi-dev libssl-dev && \
-    npm install -g yarn && \
+# Create redmine user (matching official approach)
+RUN groupadd -r -g 999 redmine && useradd -r -g redmine -u 999 redmine
+
+# Install runtime and build dependencies
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        git \
+        imagemagick \
+        tini \
+        wget \
+        # Build dependencies
+        gcc \
+        postgresql-server-dev-all \
+        libyaml-dev \
+        make \
+        patch \
+        pkgconf \
+    ; \
     rm -rf /var/lib/apt/lists/*
 
-# Set working directory
-WORKDIR /redmica
+ENV RAILS_ENV=production
+WORKDIR /usr/src/redmine
 
-# Copy Gemfiles and install gems (caching)
-COPY Gemfile* ./
-RUN bundle config set --local without 'development test' && \
-    bundle install
+# Set up home directory for redmine user
+ENV HOME=/home/redmine
+RUN set -eux; \
+    mkdir -p "$HOME"; \
+    chown redmine:redmine "$HOME"; \
+    chmod 1777 "$HOME"
 
-# Copy the rest of the Redmica app
+# Copy application code
 COPY . .
 
-# Set environment variables for production
-ENV RAILS_ENV=production
+# Install gems and set permissions
+RUN set -eux; \
+    mkdir -p log public/plugin_assets tmp/pdf tmp/pids; \
+    chown -R redmine:redmine ./; \
+    chmod -R ugo=rwX config db; \
+    find log tmp -type d -exec chmod 1777 '{}' +; \
+    \
+    # Install gems as redmine user
+    su redmine -c "bundle config --local without 'development test'"; \
+    su redmine -c "bundle install --jobs $(nproc)"; \
+    \
+    # Clean up build dependencies
+    apt-get purge -y --auto-remove gcc make patch pkgconf
 
-# Create entrypoint script for asset precompilation at runtime
-RUN echo '#!/bin/bash\n\
-set -e\n\
-echo "Precompiling assets..."\n\
-RAILS_ENV=production SECRET_KEY_BASE=${SECRET_KEY_BASE:-$(bundle exec rails secret)} bundle exec rake assets:precompile\n\
-echo "Starting Redmica..."\n\
-exec bundle exec rails server -b 0.0.0.0' > /usr/local/bin/docker-entrypoint.sh && \
-    chmod +x /usr/local/bin/docker-entrypoint.sh
+VOLUME /usr/src/redmine/files
 
-# Create non-root user and set ownership
-RUN useradd -m -u 1000 redmica && \
-    chown -R redmica:redmica /redmica
-USER redmica
+# Simple entrypoint
+RUN echo '#!/bin/bash\nset -e\nexec "$@"' > /docker-entrypoint.sh && \
+    chmod +x /docker-entrypoint.sh
 
-# Expose default Redmica port
+ENTRYPOINT ["/docker-entrypoint.sh"]
 EXPOSE 3000
-
-# Entrypoint for production
-CMD ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["rails", "server", "-b", "0.0.0.0"]
