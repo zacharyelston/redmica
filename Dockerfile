@@ -1,28 +1,59 @@
-# Dockerfile for custom Redmica build (with RAG tools and LDAP patch)
-FROM ruby:3.2-slim
+# Multi-stage build for optimized Redmica image
+FROM ruby:3.2-slim AS builder
 
-# Install system dependencies including libyaml-dev for psych gem
+# Install build dependencies
 RUN apt-get update -qq && \
-    apt-get install -y build-essential libpq-dev nodejs npm imagemagick git curl \
-                       libyaml-dev libffi-dev libssl-dev && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        libpq-dev \
+        nodejs \
+        npm \
+        git \
+        libyaml-dev \
+        libffi-dev \
+        libssl-dev && \
     npm install -g yarn && \
     rm -rf /var/lib/apt/lists/*
 
-# Set working directory
 WORKDIR /redmica
 
-# Copy Gemfiles and install gems (caching)
+# Copy and install gems
 COPY Gemfile* ./
 RUN bundle config set --local without 'development test' && \
-    bundle install
+    bundle install --jobs 4 --retry 3 && \
+    bundle clean --force
 
-# Copy the rest of the Redmica app
+# Copy application code
 COPY . .
 
-# Set environment variables for production
-ENV RAILS_ENV=production
+# Production stage
+FROM ruby:3.2-slim AS production
 
-# Create entrypoint script for asset precompilation at runtime
+# Install only runtime dependencies
+RUN apt-get update -qq && \
+    apt-get install -y --no-install-recommends \
+        libpq5 \
+        imagemagick \
+        curl \
+        libyaml-0-2 \
+        libffi8 \
+        libssl3 && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get clean
+
+WORKDIR /redmica
+
+# Copy gems from builder stage
+COPY --from=builder /usr/local/bundle /usr/local/bundle
+
+# Copy application from builder stage
+COPY --from=builder /redmica /redmica
+
+# Set environment variables
+ENV RAILS_ENV=production \
+    RAILS_SERVE_STATIC_FILES=true
+
+# Create entrypoint script
 RUN echo '#!/bin/bash\n\
 set -e\n\
 echo "Precompiling assets..."\n\
