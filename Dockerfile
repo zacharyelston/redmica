@@ -11,9 +11,7 @@ RUN apt-get update -qq && \
 WORKDIR /redmica
 
 # Copy Gemfiles and install gems (caching)
-COPY Gemfile ./
-# Copy Gemfile.lock - bundle will handle if missing
-COPY Gemfile.lock ./
+COPY Gemfile* ./
 RUN bundle config set --local without 'development test' && \
     bundle install
 
@@ -22,12 +20,14 @@ COPY . .
 
 # Set environment variables for asset compilation
 ENV RAILS_ENV=production \
-    DATABASE_URL=postgresql://dummy:dummy@dummy:5432/dummy
-ARG SECRET_KEY_BASE=dummy_key_for_build
-ENV SECRET_KEY_BASE=${SECRET_KEY_BASE}
+    DATABASE_URL=postgresql://dummy:dummy@dummy:5432/dummy \
+    SECRET_KEY_BASE=dummy_key_for_build_only
 
 # Precompile assets
 RUN bundle exec rake assets:precompile
+
+# Remove the dummy secret key after asset compilation
+ENV SECRET_KEY_BASE=
 
 # Create non-root user
 RUN useradd -m -u 1000 redmica && \
