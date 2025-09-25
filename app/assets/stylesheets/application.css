@@ -796,7 +796,8 @@ div#issue-changesets p { margin-top: 0; margin-bottom: 1em;}
 /* Prevent content from being hidden behind a #sticky-issue-header when scrolling via anchor links. */
 .controller-issues.action-show div.wiki a[name],
 .controller-issues.action-show #history div[id^="note-"],
-.controller-issues.action-show #history div[id^="change-"] {
+.controller-issues.action-show #history div[id^="change-"],
+.controller-issues.action-show #update {
   scroll-margin-top: 50px;
 }
 
@@ -1027,7 +1028,6 @@ span.pagination>span {white-space:nowrap;}
 }
 
 #search-form fieldset p {margin:0.2em 0;}
-#csv-export-options fieldset {padding: 0;}
 
 /***** Tabular forms ******/
 .tabular p{
@@ -2198,6 +2198,10 @@ div.avatar-with-child > .avatar:nth-child(2) {
   border: 2px solid rgba(255, 255, 255, 0.9);
 }
 
+div.avatar-with-child > .avatar:nth-child(2).group-avatar {
+    background-color: #ffffff;
+}
+
 h2 .avatar, h3 .avatar {margin-right: 4px;}
 h4 img.gravatar {margin: -2px 4px -4px 0;}
 /*# TODO: check where this rule is still used*/
@@ -2528,4 +2532,16 @@ th[aria-sort]:not(.no-sort):after {
 th[role=columnheader]:not(.no-sort):hover:after {
 	display: inline;
 	opacity: 1;
+}
+
+.svg-icon-sample {
+  display: flex;
+  flex-wrap: wrap;
+  list-style: none;
+  max-width: 1000px
+}
+
+.svg-icon-sample li {
+  padding: 0.5rem;
+  width: calc(200px - 0.5rem * 2);
 }

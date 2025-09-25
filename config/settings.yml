@@ -301,6 +301,11 @@ default_users_no_self_notified:
   default: 1
 default_users_time_zone:
   default: ""
+default_users_auto_watch_on:
+  serialized: true
+  default:
+  - issue_created
+  - issue_contributed_to
 # encodings used to convert files content to UTF-8
 # multiple values accepted, comma separated
 repositories_encodings:
@@ -314,7 +319,7 @@ repository_log_display_limit:
   format: int
   default: 100
 ui_theme:
-  default: 'bleuclair'
+  default: ''
 emails_footer:
   default: |-
     You have received this notification because you have either subscribed to it, or are involved in it.

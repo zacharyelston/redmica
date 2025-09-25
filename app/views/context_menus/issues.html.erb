@@ -111,7 +111,7 @@
     <a href="#" class="submenu"><%= l(:field_done_ratio) %></a>
     <span class="icon-only"><%= sprite_icon('angle-right', rtl: true) %></span>
     <ul>
-    <% (0..10).map{|x|x*10}.each do |p| -%>
+    <% (0..100).step(Setting.issue_done_ratio_interval.to_i).each do |p| -%>
         <li><%= context_menu_link "#{p}%", _bulk_update_issues_path(@issue, :ids => @issue_ids, :issue => {'done_ratio' => p}, :back_url => @back), :method => :patch,
                                       :selected => (@issue && p == @issue.done_ratio), :disabled => (!@can[:edit] || @issues.any?(&:done_ratio_derived?)) %></li>
     <% end -%>
@@ -173,8 +173,10 @@
   <li><%= context_menu_link sprite_icon('copy', l(:button_copy)), bulk_edit_issues_path(:ids => @issue_ids, :copy => '1'),
                             :class => 'icon icon-copy', :disabled => !@can[:copy] %></li>
 <% end %>
-  <li><%= context_menu_link sprite_icon('del', l(:button_delete_object, object_name: (@issue_ids.size > 1 ? l(:label_issue_plural) : l(:label_issue))).capitalize), issues_path(:ids => @issue_ids, :back_url => @back),
-                            :method => :delete, :data => {:confirm => issues_destroy_confirmation_message(@issues)}, :class => 'icon icon-del', :disabled => !@can[:delete] %></li>
+  <% if @include_delete %>
+    <li><%= context_menu_link sprite_icon('del', l(:button_delete_object, object_name: (@issue_ids.size > 1 ? l(:label_issue_plural) : l(:label_issue))).capitalize), issues_path(:ids => @issue_ids, :back_url => @back),
+                              :method => :delete, :data => {:confirm => issues_destroy_confirmation_message(@issues)}, :class => 'icon icon-del', :disabled => !@can[:delete] %></li>
+  <% end %>
 
   <%= call_hook(:view_issues_context_menu_end, {:issues => @issues, :can => @can, :back => @back }) %>
 </ul>

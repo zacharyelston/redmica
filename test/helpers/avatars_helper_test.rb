@@ -36,11 +36,17 @@ class AvatarsHelperTest < Redmine::HelperTest
   end
 
   def test_avatar_with_anonymous_user
-    assert_match %r{src="/assets/anonymous(-\w+)?.png"}, avatar(User.anonymous)
+    avatar_tag = avatar(User.anonymous)
+
+    assert_match %r{src="/assets/anonymous(-\w+)?.png"}, avatar_tag
+    assert_match 'class="anonymous-avatar avatar"', avatar_tag
   end
 
   def test_avatar_with_group
-    assert_match %r{src="/assets/group(-\w+)?.png"}, avatar(Group.first)
+    avatar_tag = avatar(Group.first)
+
+    assert_match %r{src="/assets/group(-\w+)?.png"}, avatar_tag
+    assert_match 'class="group-avatar avatar"', avatar_tag
   end
 
   def test_avatar_with_invalid_arg_should_return_nil
@@ -82,7 +88,7 @@ class AvatarsHelperTest < Redmine::HelperTest
 
   def test_avatar_disabled_should_display_user_initials
     with_settings :gravatar_enabled => '0' do
-      assert_equal "<span role=\"img\" class=\"avatar-color-2 avatar s24\">JS</span>", avatar(User.find_by_mail('jsmith@somenet.foo'))
+      assert_equal "<span role=\"img\" class=\"avatar-color-2 s24 avatar\">JS</span>", avatar(User.find_by_mail('jsmith@somenet.foo'))
     end
   end
 
